@@ -1,0 +1,1 @@
+/opt/mssql-tools/bin/sqlcmd -S 127.0.0.1 -U sa -P TestDevelopment1 -i ./create_order_db.sql

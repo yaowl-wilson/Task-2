@@ -1,0 +1,99 @@
+########## Config Map: Environment Settings for Order MSSQL Database Credentials ##########
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-mssql-env-setting
+data:
+  env_mssql_pid: Developer
+---
+
+########## Secrets: Environment Settings for Order MSSQL Database Credentials ##########
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-mssql-env-setting
+type: Opaque
+data:
+  env_mssql_password: VGVzdGluZ1Bhc3N3b3JkMQ== #TestingPassword1
+---
+
+########## Persistent Volume: Environment Settings for Order MSSQL Database storage ##########
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pv-claim-data-sql
+spec:
+  storageClassName: sqlserver
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+      
+---
+########## StatefulSet: Order MSSQL Database ##########
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sqlserverstatefulset
+spec:
+  serviceName: db-mssql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-mssql-order
+  updateStrategy:
+    type: OnDelete
+  template:
+    metadata:
+      labels:
+        app: db-mssql-order
+    spec:
+      securityContext:
+        fsGroup: 10001
+      hostname:
+        mssql_order
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: sql2019
+        image: yaowl/test-order-db-prod:1.0.0
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", /src/run.sh ]
+        resources:
+          requests:
+            memory: "2Gi"
+          limits:
+            memory: "3Gi"
+        ports:
+        - name: dbport
+          containerPort: 1433
+        volumeMounts:
+        - name: mssqldb
+          mountPath: "/data"
+      volumes:
+      - name: mssqldb
+        hostPath:
+          # Ensure the file directory is created.
+          path: /run/desktop/mnt/host/c/database
+          type: DirectoryOrCreate
+        #persistentVolumeClaim:
+        #  claimName: pv-claim-data-sql
+---
+
+########## Service: Order MSSQL Port ##########
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-mssql
+spec:
+  selector:
+    app: db-mssql-order
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+      nodePort: 31433
+  type: NodePort
